@@ -24033,6 +24033,12 @@ end;
 function SwitchToThread: BOOL; stdcall; external kernel32 name 'SwitchToThread';
 {$endif}
 
+function SwitchToThread: BOOL;
+begin
+  Sleep(1);
+  Result := true;
+end;
+
 procedure SleepHiRes(ms: cardinal);
 begin
   if (ms<>0) or not SwitchToThread then
@@ -26828,16 +26834,44 @@ begin
   result := -1;
 end;
 
+function GetFileAttributesExEmulated(lpFileName: PChar; fInfoLevelId: TGetFileExInfoLevels;
+  lpFileInformation: Pointer): BOOL; stdcall;
+var
+  Handle: THandle;
+  FindData: TWin32FindData;
+begin
+  Handle := Windows.FindFirstFile(lpFileName, FindData);
+  if Handle <> INVALID_HANDLE_VALUE then
+  begin
+    Windows.FindClose(Handle);
+    if lpFileInformation <> nil then
+    begin
+      Move(FindData, lpFileInformation^, SizeOf(TWin32FileAttributeData));
+      Result := True;
+      Exit;
+    end;
+  end;
+  Result := False;
+end;
+
 function FileSize(const FileName: TFileName): Int64;
 {$ifdef MSWINDOWS}
-var FA: WIN32_FILE_ATTRIBUTE_DATA;
-begin // 5 times faster than CreateFile, GetFileSizeEx, CloseHandle
-  if GetFileAttributesEx(pointer(FileName),GetFileExInfoStandard,@FA) then begin
-    PInt64Rec(@result)^.Lo := FA.nFileSizeLow;
-    PInt64Rec(@result)^.Hi := FA.nFileSizeHigh;
-  end else
-    result := 0;
-end;          
+//var FA: WIN32_FILE_ATTRIBUTE_DATA;
+//begin // 5 times faster than CreateFile, GetFileSizeEx, CloseHandle
+//  if GetFileAttributesEx(pointer(FileName),GetFileExInfoStandard,@FA) then begin
+//    PInt64Rec(@result)^.Lo := FA.nFileSizeLow;
+////    PInt64Rec(@result)^.Hi := FA.nFileSizeHigh;
+//  end else
+//    result := 0;
+var
+  F : TSearchRec;
+begin
+  if (FindFirst(filename,faAnyFile,F) = 0) then
+    Result := F.Size
+  else
+    Result := 0;
+  FindClose(F);
+end;
 {$else}
 var f: THandle;
     res: Int64Rec absolute result;
@@ -26853,14 +26887,22 @@ end;
 
 function FileAgeToDateTime(const FileName: TFileName): TDateTime;
 {$ifdef MSWINDOWS}
-var FA: WIN32_FILE_ATTRIBUTE_DATA;
-    ST,LT: TSystemTime;
-begin // 5 times faster than CreateFile, GetFileSizeEx, CloseHandle
-  if GetFileAttributesEx(pointer(FileName),GetFileExInfoStandard,@FA) and
-     FileTimeToSystemTime(FA.ftLastWriteTime,ST) and
-     SystemTimeToTzSpecificLocalTime(nil,ST,LT) then
-    result := SystemTimeToDateTime(LT) else
-    result := 0;
+//var FA: WIN32_FILE_ATTRIBUTE_DATA;
+//    ST,LT: TSystemTime;
+//begin // 5 times faster than CreateFile, GetFileSizeEx, CloseHandle
+//  if GetFileAttributesEx(pointer(FileName),GetFileExInfoStandard,@FA) and
+//     FileTimeToSystemTime(FA.ftLastWriteTime,ST) and
+//     SystemTimeToTzSpecificLocalTime(nil,ST,LT) then
+//    result := SystemTimeToDateTime(LT) else
+//    result := 0;
+var
+  F : TSearchRec;
+begin
+  if (FindFirst(filename,faAnyFile,F) = 0) then
+    Result := FileDateToDatetime(F.Time)
+  else
+    Result := 0;
+  FindClose(F);
 end;
 {$else}
 {$ifdef HASNEWFILEAGE}
@@ -34438,6 +34480,7 @@ procedure SetExecutableVersion(aMajor,aMinor,aRelease,aBuild: integer);
 var i: integer;
 {$ifdef MSWINDOWS}
     Tmp: array[byte] of WideChar;
+    Tmp2: array[byte] of Char;
     TmpSize: cardinal;
 {$endif}
 begin
@@ -34463,12 +34506,18 @@ begin
         end else
         dec(i);
       {$ifdef MSWINDOWS}
-      TmpSize := sizeof(Tmp);
-      GetComputerNameW(Tmp,TmpSize);
-      RawUnicodeToUtf8(@Tmp,StrLenW(Tmp),Host);
-      TmpSize := sizeof(Tmp);
-      GetUserNameW(Tmp,TmpSize);
-      RawUnicodeToUtf8(@Tmp,StrLenW(Tmp),User);
+//      TmpSize := sizeof(Tmp);
+//      GetComputerNameW(Tmp,TmpSize);
+//      RawUnicodeToUtf8(@Tmp,StrLenW(Tmp),Host);
+//      TmpSize := sizeof(Tmp);
+//      GetUserNameW(Tmp,TmpSize);
+//      RawUnicodeToUtf8(@Tmp,StrLenW(Tmp),User);
+      TmpSize := sizeof(Tmp2);
+      GetComputerName(Tmp2,TmpSize);
+      Host := Tmp2;
+      TmpSize := sizeof(Tmp2);
+      GetUserName(Tmp2,TmpSize);
+      User := Tmp2;
       {$else}
       Host := GetHostName;
       {$ifdef KYLIX3}
@@ -59650,7 +59699,7 @@ begin
   exit;
   {$endif}
   {$ifdef MSWINDOWS}
-  if not IsDebuggerPresent then
+//  if not IsDebuggerPresent then
     exit;
   {$endif}
   s := CurrentAnsiConvert.UTF8ToAnsi(Name);

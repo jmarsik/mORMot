@@ -3524,6 +3524,12 @@ begin
 end;
 
 {$ifdef MSWINDOWS}
+function SwitchToThread: BOOL;
+begin
+  Sleep(1);
+  Result := true;
+end;
+
 procedure SleepHiRes(ms: cardinal);
 begin
   {$ifndef FPC} // function SwitchToThread oddly not defined in fpc\rtl\win

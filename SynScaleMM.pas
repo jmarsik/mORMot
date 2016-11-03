@@ -94,7 +94,7 @@ interface
 
 // enable Backing Off Locks with Spin-Wait Loops
 // - see http://software.intel.com/en-us/articles/implementing-scalable-atomic-locks-for-multi-core-intel-em64t-and-ia32-architectures
-{$define SPINWAITBACKOFF}
+{.$define SPINWAITBACKOFF}
 
 // other posible defines:
 {.$define ALLOCBY64}      // allocated by 64 memory items (if undefined, by 32)
